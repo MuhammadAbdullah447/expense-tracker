@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // ─── Edit Expense Screen — existing expense update karo ───
 class EditExpenseScreen extends StatefulWidget {
@@ -76,11 +77,11 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
   }
 
   // ─── Update expense — Provider ke zariye Firestore mein ───
+  // ─── Update expense ───
   Future<void> _updateExpense() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // Updated expense object banao
       final updatedExpense = ExpenseModel(
         id:       widget.expense.id,
         title:    _titleController.text.trim(),
@@ -90,7 +91,9 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
         note:     _noteController.text.trim(),
       );
 
-      await context.read<ExpenseProvider>().updateExpense(updatedExpense);
+      await context
+          .read<ExpenseProvider>()
+          .updateExpense(updatedExpense);
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -103,7 +106,6 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
           ),
         );
 
-        // Wapas home pe jao
         Navigator.pop(context);
       }
     }

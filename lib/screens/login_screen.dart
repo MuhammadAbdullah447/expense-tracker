@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'signup_screen.dart';
 import 'main_screen.dart';
+import 'signup_screen.dart';
 
-// ─── Login Screen — Firebase Auth ✅ ───
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -11,166 +12,303 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
 
-  // Form key — validation ke liye
-  final _formKey = GlobalKey<FormState>();
-
-  // Text controllers
+  // ─── Form & Controllers ───
+  final _formKey                                  = GlobalKey<FormState>();
   final TextEditingController _emailController    = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // State variables
+  // ─── Focus Nodes ───
+  final FocusNode _emailFocus    = FocusNode();
+  final FocusNode _passwordFocus = FocusNode();
+
+  // ─── State Variables ───
   bool _isLoading       = false;
   bool _passwordVisible = false;
+  bool _rememberMe      = false;
+  bool _emailValid      = false;
 
-  // Firebase Auth instance
+  // ─── Animation Controllers ───
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late AnimationController _iconController;
+  late List<Animation<double>> _fieldAnimations;
+  late Animation<double> _iconScaleAnimation;
+
+  // ─── Colors ───
+  static const primary     = Color(0xFF10B981);
+  static const primaryDark = Color(0xFF059669);
+  static const bgColor     = Color(0xFFF0FDF4);
+  static const textPrimary = Color(0xFF0F172A);
+  static const textSecond  = Color(0xFF64748B);
+  static const borderColor = Color(0xFFE2E8F0);
+  static const errorColor  = Color(0xFFEF4444);
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _initAnimations();
+    _addListeners();
   }
 
-  // ─── Login function — Firebase Auth ───
+  // ─── Animations initialize ───
+  void _initAnimations() {
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+
+    // ─── Icon bounce animation ───
+    _iconController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+
+    _iconScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+          parent: _iconController, curve: Curves.elasticOut),
+    );
+
+    // ─── Staggered field animations ───
+    _fieldAnimations = List.generate(6, (index) {
+      final start = index * 0.12;
+      final end   = (start + 0.5).clamp(0.0, 1.0);
+      return Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _slideController,
+          curve: Interval(start, end, curve: Curves.easeOut),
+        ),
+      );
+    });
+  }
+
+  // ─── Real time validation ───
+  void _addListeners() {
+    _emailController.addListener(() {
+      final emailRegex = RegExp(r'^[\w.-]+@[\w.-]+\.\w+$');
+      setState(() {
+        _emailValid =
+            emailRegex.hasMatch(_emailController.text.trim());
+      });
+    });
+  }
+
+  // ─── Login function ───
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
+      HapticFeedback.lightImpact();
       setState(() => _isLoading = true);
 
       try {
         await _auth.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
+          email:    _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
-        // Login successful — main screen pe jao
         if (mounted) {
+          HapticFeedback.heavyImpact();
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-          );
-        }
-      } on FirebaseAuthException catch (e) {
-        // Error handle karo
-        String message = 'Something went wrong';
-        if (e.code == 'user-not-found') {
-          message = 'No account found with this email';
-        } else if (e.code == 'wrong-password') {
-          message = 'Incorrect password';
-        } else if (e.code == 'invalid-email') {
-          message = 'Invalid email address';
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.red,
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const MainScreen(),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+              transitionDuration:
+              const Duration(milliseconds: 500),
             ),
           );
         }
+      } on FirebaseAuthException catch (e) {
+        String msg = 'Something went wrong';
+        if (e.code == 'user-not-found') {
+          msg = 'No account found with this email';
+        } else if (e.code == 'wrong-password' ||
+            e.code == 'invalid-credential') {
+          msg = 'Incorrect email or password';
+        } else if (e.code == 'invalid-email') {
+          msg = 'Invalid email address';
+        } else if (e.code == 'too-many-requests') {
+          msg = 'Too many attempts. Try again later';
+        }
+        if (mounted) {
+          HapticFeedback.vibrate();
+          _showErrorSnackbar(msg);
+        }
       }
-
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ─── Reset password function ───
+  // ─── Reset password ───
   Future<void> _resetPassword() async {
     if (_emailController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email first'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showErrorSnackbar('Please enter your email first');
       return;
     }
-
     try {
       await _auth.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
-      );
+          email: _emailController.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Password reset email sent!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Password reset email sent!',
+                    style: GoogleFonts.poppins(
+                        color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message ?? 'Error sending reset email'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showErrorSnackbar(e.message ?? 'Error sending reset email');
     }
+  }
+
+  void _showErrorSnackbar(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(msg,
+                  style:
+                  GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
+        ),
+        backgroundColor: errorColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    _iconController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: FadeTransition(
+          opacity: _fadeController,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
 
-            // ─── Top header ───
-            _buildHeader(),
+                // ─── Header ───
+                _buildHeader(),
 
-            // ─── Form ───
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                // ─── Form ───
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      24, 20, 24, 30),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
 
-                    // Email field
-                    _buildLabel('Email'),
-                    _buildEmailField(),
-                    const SizedBox(height: 16),
+                        // ─── Email ───
+                        _buildAnimatedField(
+                            0, _buildEmailField()),
+                        const SizedBox(height: 20),
 
-                    // Password field
-                    _buildLabel('Password'),
-                    _buildPasswordField(),
-                    const SizedBox(height: 8),
+                        // ─── Password ───
+                        _buildAnimatedField(
+                            1, _buildPasswordField()),
+                        const SizedBox(height: 12),
 
-                    // Forgot password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _resetPassword,
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(color: Color(0xFF1E3A5F)),
-                        ),
-                      ),
+                        // ─── Remember Me + Forgot ───
+                        _buildAnimatedField(
+                            2, _buildRememberRow()),
+                        const SizedBox(height: 28),
+
+                        // ─── Login Button ───
+                        _buildAnimatedField(
+                            3, _buildLoginButton()),
+                        const SizedBox(height: 20),
+
+                        // ─── Divider ───
+                        _buildAnimatedField(
+                            4, _buildDivider()),
+                        const SizedBox(height: 20),
+
+                        // ─── Quick Stats ───
+                        _buildAnimatedField(
+                            4, _buildQuickStats()),
+                        const SizedBox(height: 24),
+
+                        // ─── Signup Link ───
+                        _buildAnimatedField(
+                            5, _buildSignupLink()),
+                        const SizedBox(height: 20),
+                      ],
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Login button
-                    _buildLoginButton(),
-
-                    const SizedBox(height: 16),
-
-                    // Signup link
-                    _buildSignupLink(),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ─── Staggered animation wrapper ───
+  Widget _buildAnimatedField(int index, Widget child) {
+    return AnimatedBuilder(
+      animation: _fieldAnimations[index.clamp(0, 5)],
+      builder: (context, _) {
+        final value = _fieldAnimations[index.clamp(0, 5)].value;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 24 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
@@ -178,153 +316,252 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+      padding: const EdgeInsets.fromLTRB(24, 55, 24, 40),
       decoration: const BoxDecoration(
-        color: Color(0xFF1E3A5F),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF064E3B),
+            Color(0xFF065F46),
+            Color(0xFF047857),
+          ],
+        ),
         borderRadius: BorderRadius.only(
-          bottomLeft:  Radius.circular(30),
-          bottomRight: Radius.circular(30),
+          bottomLeft:  Radius.circular(36),
+          bottomRight: Radius.circular(36),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.account_balance_wallet,
-              color: Colors.white,
-              size: 36,
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Welcome Back!',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+
+          // ─── Animated Icon ───
+          ScaleTransition(
+            scale: _iconScaleAnimation,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.2)),
+              ),
+              child: const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: Colors.white,
+                size: 30,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+
+          const SizedBox(height: 22),
+
+          // ─── Welcome text ───
+          Text(
+            'Welcome Back! 👋',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
             'Login to track your expenses',
-            style: TextStyle(color: Colors.white70, fontSize: 15),
+            style: GoogleFonts.poppins(
+              color: Colors.white.withOpacity(0.75),
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // ─── Stats row in header ───
+          Row(
+            children: [
+              _buildHeaderStat('🔒', 'Secure'),
+              const SizedBox(width: 12),
+              _buildHeaderStat('☁️', 'Cloud Sync'),
+              const SizedBox(width: 12),
+              _buildHeaderStat('📊', 'Analytics'),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ─── Label ───
-  Widget _buildLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontWeight: FontWeight.w600,
-        fontSize: 14,
-        color: Color(0xFF1E3A5F),
+  // ─── Header stat chip ───
+  Widget _buildHeaderStat(String emoji, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: Colors.white.withOpacity(0.15)),
       ),
-    ),
-  );
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  // ─── Email field ───
+  // ─── Email Field ───
   Widget _buildEmailField() {
-    return TextFormField(
-      controller: _emailController,
-      keyboardType: TextInputType.emailAddress,
-      decoration: _inputDecoration('Enter your email', Icons.email_outlined),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Please enter email';
-        }
-        // Email regex validation
-        final RegExp emailRegex = RegExp(r'^[\w.-]+@[\w.-]+\.\w+$');
-        if (!emailRegex.hasMatch(value.trim())) {
-          return 'Enter valid email address';
-        }
-        return null;
-      },
-    );
-  }
-
-  // ─── Password field ───
-  Widget _buildPasswordField() {
-    return TextFormField(
-      controller: _passwordController,
-      obscureText: !_passwordVisible,
-      decoration: _inputDecoration(
-        'Enter your password',
-        Icons.lock_outlined,
-      ).copyWith(
-        suffixIcon: IconButton(
-          icon: Icon(
-            _passwordVisible ? Icons.visibility_off : Icons.visibility,
-            color: Colors.grey,
-          ),
-          onPressed: () =>
-              setState(() => _passwordVisible = !_passwordVisible),
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Please enter password';
-        }
-        if (value.trim().length < 6) {
-          return 'Password must be at least 6 characters';
-        }
-        return null;
-      },
-    );
-  }
-
-  // ─── Login button ───
-  Widget _buildLoginButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF1E3A5F),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 3,
-        ),
-        onPressed: _isLoading ? null : _login,
-        child: _isLoading
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Text(
-          'Login',
-          style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  // ─── Signup link ───
-  Widget _buildSignupLink() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Don't have an account? "),
-        GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SignupScreen()),
+        _buildLabel('Email Address'),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller:      _emailController,
+          focusNode:       _emailFocus,
+          keyboardType:    TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () =>
+              FocusScope.of(context).requestFocus(_passwordFocus),
+          style: GoogleFonts.poppins(
+              color: textPrimary, fontSize: 14),
+          decoration: _fieldDecoration(
+            hint:    'Enter your email',
+            icon:    Icons.email_outlined,
+            isValid: _emailValid,
           ),
-          child: const Text(
-            'Sign Up',
-            style: TextStyle(
-              color: Color(0xFF1E3A5F),
-              fontWeight: FontWeight.bold,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter email';
+            }
+            final regex = RegExp(r'^[\w.-]+@[\w.-]+\.\w+$');
+            if (!regex.hasMatch(value.trim())) {
+              return 'Enter valid email address';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  // ─── Password Field ───
+  Widget _buildPasswordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Password'),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller:      _passwordController,
+          focusNode:       _passwordFocus,
+          obscureText:     !_passwordVisible,
+          textInputAction: TextInputAction.done,
+          onEditingComplete: () =>
+              FocusScope.of(context).unfocus(),
+          style: GoogleFonts.poppins(
+              color: textPrimary, fontSize: 14),
+          decoration: _fieldDecoration(
+            hint: 'Enter your password',
+            icon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(
+                _passwordVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: textSecond,
+                size: 20,
+              ),
+              onPressed: () => setState(
+                      () => _passwordVisible = !_passwordVisible),
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter password';
+            }
+            if (value.trim().length < 6) {
+              return 'Password must be at least 6 characters';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  // ─── Remember Me + Forgot Password ───
+  Widget _buildRememberRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // ─── Remember Me ───
+        GestureDetector(
+          onTap: () =>
+              setState(() => _rememberMe = !_rememberMe),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: _rememberMe ? primary : Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color:
+                    _rememberMe ? primary : borderColor,
+                    width: 1.5,
+                  ),
+                ),
+                child: _rememberMe
+                    ? const Icon(Icons.check,
+                    color: Colors.white, size: 14)
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Remember me',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: textSecond,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ─── Forgot Password ───
+        GestureDetector(
+          onTap: _resetPassword,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 4),
+            child: Text(
+              'Forgot Password?',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -332,32 +569,237 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ─── Reusable input decoration ───
-  InputDecoration _inputDecoration(String hint, IconData icon) {
+  // ─── Login Button ───
+  Widget _buildLoginButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _login,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: _isLoading
+              ? null
+              : const LinearGradient(
+            colors: [primary, primaryDark],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          color: _isLoading ? Colors.grey.shade300 : null,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _isLoading
+              ? []
+              : [
+            BoxShadow(
+              color: primary.withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Center(
+          child: _isLoading
+              ? const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2.5,
+            ),
+          )
+              : Text(
+            'Login',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Divider ───
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        Expanded(
+            child: Divider(color: borderColor, thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'or',
+            style: GoogleFonts.poppins(
+                fontSize: 13, color: textSecond),
+          ),
+        ),
+        Expanded(
+            child: Divider(color: borderColor, thickness: 1)),
+      ],
+    );
+  }
+
+  // ─── Quick Stats Section ───
+  Widget _buildQuickStats() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildStatItem('📈', 'Track', 'Expenses'),
+          _buildVerticalDivider(),
+          _buildStatItem('💰', 'Budget', 'Control'),
+          _buildVerticalDivider(),
+          _buildStatItem('📊', 'Visual', 'Reports'),
+        ],
+      ),
+    );
+  }
+
+  // ─── Stat item ───
+  Widget _buildStatItem(
+      String emoji, String title, String subtitle) {
+    return Column(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 22)),
+        const SizedBox(height: 4),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: textPrimary,
+          ),
+        ),
+        Text(
+          subtitle,
+          style: GoogleFonts.poppins(
+              fontSize: 10, color: textSecond),
+        ),
+      ],
+    );
+  }
+
+  // ─── Vertical divider ───
+  Widget _buildVerticalDivider() {
+    return Container(
+      height: 40,
+      width: 1,
+      color: borderColor,
+    );
+  }
+
+  // ─── Signup Link ───
+  Widget _buildSignupLink() {
+    return Center(
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const SignupScreen(),
+            transitionsBuilder: (_, anim, __, child) =>
+                SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1.0, 0.0),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                      parent: anim, curve: Curves.easeOut)),
+                  child: child,
+                ),
+            transitionDuration:
+            const Duration(milliseconds: 400),
+          ),
+        ),
+        child: RichText(
+          text: TextSpan(
+            style: GoogleFonts.poppins(
+                fontSize: 14, color: textSecond),
+            children: [
+              const TextSpan(text: "Don't have an account? "),
+              TextSpan(
+                text: 'Sign Up',
+                style: GoogleFonts.poppins(
+                  color: primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Label widget ───
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.poppins(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: textPrimary,
+      ),
+    );
+  }
+
+  // ─── Reusable field decoration ───
+  InputDecoration _fieldDecoration({
+    required String hint,
+    required IconData icon,
+    bool isValid = false,
+  }) {
     return InputDecoration(
       hintText: hint,
-      prefixIcon: Icon(icon, color: const Color(0xFF1E3A5F)),
+      hintStyle: GoogleFonts.poppins(
+          color: textSecond.withOpacity(0.6), fontSize: 13),
+      prefixIcon: Icon(icon, color: textSecond, size: 20),
+      suffixIcon: isValid
+          ? const Icon(Icons.check_circle,
+          color: primary, size: 20)
+          : null,
       filled: true,
       fillColor: Colors.white,
-      contentPadding:
-      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(14),
+        borderSide:
+        const BorderSide(color: borderColor, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide:
-        const BorderSide(color: Color(0xFF1E3A5F), width: 2),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red),
+        borderRadius: BorderRadius.circular(14),
+        borderSide:
+        const BorderSide(color: errorColor, width: 1.5),
       ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: errorColor, width: 2),
+      ),
+      errorStyle: GoogleFonts.poppins(
+          fontSize: 11, color: errorColor),
     );
   }
 }
