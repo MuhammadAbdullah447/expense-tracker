@@ -171,17 +171,21 @@ class _SignupScreenState extends State<SignupScreen>
           );
         }
       } on FirebaseAuthException catch (e) {
-        String msg = 'Something went wrong';
+        String message = 'Something went wrong. Please try again.';
         if (e.code == 'email-already-in-use') {
-          msg = 'Account already exists with this email';
+          message = 'An account already exists with this email.';
         } else if (e.code == 'weak-password') {
-          msg = 'Password is too weak';
+          message = 'Password is too weak. Use at least 6 characters.';
         } else if (e.code == 'invalid-email') {
-          msg = 'Invalid email address';
+          message = 'Please enter a valid email address.';
+        } else if (e.code == 'network-request-failed') {
+          message = 'No internet connection. Please check your network.';
+        } else if (e.code == 'operation-not-allowed') {
+          message = 'Email/password accounts are not enabled.';
         }
         if (mounted) {
           HapticFeedback.vibrate();
-          _showErrorSnackbar(msg);
+          _showErrorSnackbar(message);
         }
       }
       if (mounted) setState(() => _isLoading = false);

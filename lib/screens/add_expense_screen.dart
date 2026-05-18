@@ -444,14 +444,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen>
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter amount';
+                          return 'Amount is required';
                         }
-                        final regex = RegExp(r'^\d+(\.\d{1,2})?$');
-                        if (!regex.hasMatch(value.trim())) {
-                          return 'Enter valid amount';
+                        final RegExp amountRegex = RegExp(r'^\d+(\.\d{1,2})?$');
+                        if (!amountRegex.hasMatch(value.trim())) {
+                          return 'Enter valid amount (e.g. 500 or 500.50)';
                         }
-                        if (double.parse(value.trim()) <= 0) {
+                        final double amount = double.parse(value.trim());
+                        if (amount <= 0) {
                           return 'Amount must be greater than 0';
+                        }
+                        if (amount > 10000000) {
+                          return 'Amount seems too large. Please check.';
                         }
                         return null;
                       },
@@ -610,13 +614,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen>
 
             return GestureDetector(
               onTap: () {
-                HapticFeedback.lightImpact();
-                setState(
-                        () => _selectedCategory = cat['name']);
+                HapticFeedback.mediumImpact();
+                setState(() => _selectedCategory = cat['name']);
               },
+              onTapDown: (_) => setState(() {}),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.elasticOut,
                 decoration: BoxDecoration(
                   color: isSelected
                       ? color

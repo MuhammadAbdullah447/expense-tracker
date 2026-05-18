@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main_screen.dart';
 import 'login_screen.dart';
+// ─── Import add karo ───
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -103,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-        user != null ? const MainScreen() : const LoginScreen(),
+        user != null ? const MainScreen() : const OnboardingScreen(),
         // ─── Smooth fade transition ───
         transitionsBuilder: (context, animation, secondary, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -416,6 +418,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   // ─── Animated Loading Dots ───
+// ─── Animated Loading Dots ───
   Widget _buildLoadingDots() {
     return AnimatedBuilder(
       animation: _pulseController,
@@ -423,21 +426,26 @@ class _SplashScreenState extends State<SplashScreen>
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(3, (index) {
-            // ─── Har dot ka alag delay ───
-            final delay = index * 0.3;
-            final animValue = (_pulseController.value - delay)
+            // ─── Staggered delay per dot ───
+            final delay  = index * 0.25;
+            final value  = (_pulseController.value - delay)
                 .clamp(0.0, 1.0);
-            final dotSize = 6.0 + (animValue * 4);
+            final sine   = (value * 3.14159).clamp(0.0, 3.14159);
+            final bounce = (sine < 0 ? 0.0 : sine) * 8;
 
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Container(
-                width: dotSize,
-                height: dotSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF10B981)
-                      .withOpacity(0.4 + animValue * 0.6),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 5),
+              child: Transform.translate(
+                offset: Offset(0, -bounce),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(
+                        0.4 + value * 0.6),
+                  ),
                 ),
               ),
             );

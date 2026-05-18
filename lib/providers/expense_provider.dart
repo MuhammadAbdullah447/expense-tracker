@@ -63,10 +63,12 @@ class ExpenseProvider extends ChangeNotifier {
         final data = doc.data();
         return ExpenseModel(
           id:       doc.id,
-          title:    data['title'],
-          amount:   data['amount'].toDouble(),
-          category: data['category'],
-          date:     (data['date'] as Timestamp).toDate(),
+          title:    data['title']    ?? 'Unknown',
+          amount:   (data['amount']  ?? 0).toDouble(),
+          category: data['category'] ?? 'Other',
+          date:     data['date'] != null
+              ? (data['date'] as Timestamp).toDate()
+              : DateTime.now(),
           note:     data['note'] ?? '',
         );
       }).toList();

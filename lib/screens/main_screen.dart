@@ -11,6 +11,7 @@ import 'login_screen.dart';
 import 'search_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
+import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -336,12 +337,15 @@ class _MainScreenState extends State<MainScreen>
   Widget _buildFAB() {
     return GestureDetector(
       onTapDown: (_) {
-        HapticFeedback.lightImpact();
+        HapticFeedback.heavyImpact();
         _fabController.forward();
       },
       onTapUp: (_) {
         _fabController.reverse();
-        _navigateToAddExpense();
+        Future.delayed(
+          const Duration(milliseconds: 100),
+          _navigateToAddExpense,
+        );
       },
       onTapCancel: () => _fabController.reverse(),
       child: ScaleTransition(
@@ -496,8 +500,16 @@ class _MainScreenState extends State<MainScreen>
                     Icons.person_outline_rounded,
                     'My Profile',
                     primary,
-                        () => Navigator.pop(ctx),
+                        () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ProfileScreen()),
+                      );
+                    },
                   ),
+
                   _buildSheetItem(
                     Icons.settings_outlined,
                     'Settings',

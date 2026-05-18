@@ -4,14 +4,12 @@ import 'package:provider/provider.dart';
 import 'providers/expense_provider.dart';
 import 'screens/splash_screen.dart';
 
-// App ka entry point
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
-// Root widget — Provider wrap karo poori app ko
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -24,9 +22,17 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF1E3A5F),
+            seedColor: const Color(0xFF10B981),
           ),
           useMaterial3: true,
+
+          // ─── Global page transitions ───
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: {
+              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.iOS:     CupertinoPageTransitionsBuilder(),
+            },
+          ),
         ),
         home: const SplashScreen(),
       ),

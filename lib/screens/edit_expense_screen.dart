@@ -285,6 +285,11 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
                 if (double.parse(value.trim()) <= 0) {
                   return 'Amount must be greater than 0';
                 }
+
+                if (double.parse(value.trim()) > 10000000) {
+                  return 'Amount seems too large. Please check.';
+                }
+
                 return null;
               },
             ),

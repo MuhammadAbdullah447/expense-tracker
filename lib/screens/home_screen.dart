@@ -382,13 +382,18 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 6),
 
                 // ─── Amount ───
-                Text(
-                  'Rs. ${_formatAmount(spent)}',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: spent),
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeOut,
+                  builder: (_, value, __) => Text(
+                    'Rs. ${_formatAmount(value)}',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
 
@@ -956,34 +961,94 @@ class _HomeScreenState extends State<HomeScreen>
 
           // ─── Empty State ───
           if (provider.expenses.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.receipt_long_outlined,
-                      size: 50, color: Colors.grey.shade300),
-                  const SizedBox(height: 12),
-                  Text('No transactions yet!',
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: primary.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                          Icons.receipt_long_outlined,
+                          size: 48, color: primary),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('No Expenses Yet!',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimary,
+                        )),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Start tracking your spending\nby tapping the + button below.',
+                      textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
-                          color: textSecond, fontSize: 14)),
-                  const SizedBox(height: 6),
-                  Text('Tap + to add your first expense',
-                      style: GoogleFonts.poppins(
-                          color: Colors.grey.shade400,
-                          fontSize: 12)),
-                ],
+                          fontSize: 13,
+                          color: textSecond,
+                          height: 1.5),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: primary.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add_rounded,
+                              color: primary, size: 16),
+                          const SizedBox(width: 6),
+                          Text('Add First Expense',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: primary,
+                                fontWeight: FontWeight.w600,
+                              )),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )
           else
           // ─── Show max 5 recent ───
             ...provider.expenses
                 .take(5)
-                .map((expense) => _buildTransactionCard(
-                expense, provider)),
+                .toList()
+                .asMap()
+                .entries
+                .map((entry) {
+              final index   = entry.key;
+              final expense = entry.value;
+              return TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: Duration(
+                    milliseconds: 300 + index * 80),
+                curve: Curves.easeOut,
+                builder: (_, value, child) => Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 30 * (1 - value)),
+                    child: child,
+                  ),
+                ),
+                child: _buildTransactionCard(
+                    expense, provider),
+              );
+            }),
+
+
         ],
       ),
     );

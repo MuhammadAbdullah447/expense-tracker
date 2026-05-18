@@ -334,8 +334,18 @@ class _ReportsScreenState extends State<ReportsScreen>
                       _selectedMonth = month;
                       _touchedIndex  = -1;
                     });
+                    // ─── Animate charts on month change ───
+                    _fadeController.reset();
                     _chartController.reset();
-                    _chartController.forward();
+                    Future.delayed(
+                      const Duration(milliseconds: 100),
+                          () {
+                        if (mounted) {
+                          _fadeController.forward();
+                          _chartController.forward();
+                        }
+                      },
+                    );
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),

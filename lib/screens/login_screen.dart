@@ -128,16 +128,20 @@ class _LoginScreenState extends State<LoginScreen>
           );
         }
       } on FirebaseAuthException catch (e) {
-        String msg = 'Something went wrong';
+        String msg = 'Something went wrong. Please try again.';
         if (e.code == 'user-not-found') {
-          msg = 'No account found with this email';
+          msg = 'No account found with this email address.';
         } else if (e.code == 'wrong-password' ||
             e.code == 'invalid-credential') {
-          msg = 'Incorrect email or password';
+          msg = 'Incorrect email or password. Please try again.';
         } else if (e.code == 'invalid-email') {
-          msg = 'Invalid email address';
+          msg = 'Please enter a valid email address.';
         } else if (e.code == 'too-many-requests') {
-          msg = 'Too many attempts. Try again later';
+          msg = 'Too many failed attempts. Please try again later.';
+        } else if (e.code == 'network-request-failed') {
+          msg = 'No internet connection. Please check your network.';
+        } else if (e.code == 'user-disabled') {
+          msg = 'This account has been disabled. Contact support.';
         }
         if (mounted) {
           HapticFeedback.vibrate();
