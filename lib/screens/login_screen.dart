@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main_screen.dart';
 import 'signup_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -109,10 +110,23 @@ class _LoginScreenState extends State<LoginScreen>
       setState(() => _isLoading = true);
 
       try {
-        await _auth.signInWithEmailAndPassword(
+        final UserCredential cred = await _auth.signInWithEmailAndPassword(
           email:    _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+
+// ─── Fix displayName for existing users ───
+        if (cred.user != null &&
+            (cred.user!.displayName == null ||
+                cred.user!.displayName!.isEmpty)) {
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(cred.user!.uid)
+              .get();
+          if (doc.exists && doc.data()!.containsKey('name')) {
+            await cred.user!.updateDisplayName(doc.data()!['name']);
+          }
+        }
 
         if (mounted) {
           HapticFeedback.heavyImpact();

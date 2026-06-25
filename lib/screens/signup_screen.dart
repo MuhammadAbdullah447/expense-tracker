@@ -148,6 +148,8 @@ class _SignupScreenState extends State<SignupScreen>
           password: _passwordController.text.trim(),
         );
 
+        await cred.user!.updateDisplayName(_nameController.text.trim());
+
         await _firestore
             .collection('users')
             .doc(cred.user!.uid)

@@ -52,12 +52,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen>
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Food',          'icon': Icons.restaurant_outlined,      'color': Color(0xFFFF9800)},
     {'name': 'Transport',     'icon': Icons.directions_car_outlined,  'color': Color(0xFF2196F3)},
-    {'name': 'Bills',         'icon': Icons.receipt_outlined,         'color': Color(0xFF3B82F6)},
+    {'name': 'Bills',         'icon': Icons.receipt_outlined,         'color': Color(0xFFF59E0B)},
     {'name': 'Health',        'icon': Icons.health_and_safety_outlined,'color': Color(0xFFE91E63)},
-    {'name': 'Entertainment', 'icon': Icons.movie_outlined,           'color': Color(0xFF9C27B0)},
+    {'name': 'Entertainment', 'icon': Icons.movie_outlined,           'color': Color(0xFF8B5CF6)},
     {'name': 'Shopping',      'icon': Icons.shopping_bag_outlined,    'color': Color(0xFF00BCD4)},
     {'name': 'Education',     'icon': Icons.school_outlined,          'color': Color(0xFF10B981)},
-    {'name': 'Other',         'icon': Icons.more_horiz_outlined,      'color': Color(0xFF607D8B)},
+    {'name': 'Other',         'icon': Icons.more_horiz,      'color': Color(0xFF607D8B)},
   ];
 
   // ─── Quick amounts ───
@@ -153,7 +153,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen>
     return '${months[_selectedDate.month - 1]} ${_selectedDate.day}, ${_selectedDate.year}';
   }
 
-  // ─── Save expense ───
   // ─── Save expense ───
   Future<void> _saveExpense() async {
     if (_formKey.currentState!.validate()) {
@@ -620,7 +619,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen>
               onTapDown: (_) => setState(() {}),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
-                curve: Curves.elasticOut,
+                curve: Curves.easeOut,
                 decoration: BoxDecoration(
                   color: isSelected
                       ? color

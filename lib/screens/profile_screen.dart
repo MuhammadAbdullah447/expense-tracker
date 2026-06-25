@@ -31,6 +31,14 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isEditingName = false;
   bool _isLoading     = false;
 
+  // ─── Get real user name ───
+  String _getUserName(User? user) {
+    if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+      return user.displayName!;
+    }
+    return 'User';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         .animate(CurvedAnimation(
         parent: _fadeController, curve: Curves.easeIn));
 
-    _nameController.text = AppConstants.developerName;
+    _nameController.text = _getUserName(_auth.currentUser);
   }
 
   @override
@@ -144,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     icon:     Icons.person_outline_rounded,
                     iconColor: AppColors.primary,
                     title:    'Full Name',
-                    value:    AppConstants.developerName,
+                    value: _getUserName(user),
                   ),
                   _buildInfoTile(
                     icon:     Icons.email_outlined,
@@ -375,7 +383,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           const SizedBox(height: 14),
 
           Text(
-            AppConstants.developerName,
+            _getUserName(user),
             style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: 20,

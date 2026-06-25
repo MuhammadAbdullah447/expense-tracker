@@ -33,7 +33,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // ─── Onboarding Data ───
   final List<Map<String, dynamic>> _pages = [
     {
-      'gradient': [Color(0xFF064E3B), Color(0xFF065F46)],
+      'gradient': [Color(0xFF065F46), Color(0xFF047857)],
       'icon':     Icons.account_balance_wallet_outlined,
       'emoji':    '💰',
       'title':    'Track Every Rupee',
@@ -45,7 +45,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ],
     },
     {
-      'gradient': [Color(0xFF1E3A5F), Color(0xFF2D5A8E)],
+      'gradient': [Color(0xFF065F46), Color(0xFF047857)],
       'icon':     Icons.bar_chart_rounded,
       'emoji':    '📊',
       'title':    'Visual Analytics',
@@ -57,7 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ],
     },
     {
-      'gradient': [Color(0xFF4A1D96), Color(0xFF6D28D9)],
+      'gradient': [Color(0xFF065F46), Color(0xFF047857)],
       'icon':     Icons.savings_outlined,
       'emoji':    '🎯',
       'title':    'Budget Control',
@@ -91,31 +91,33 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void _initAnimations() {
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
     )..forward();
 
     _slideController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 600),
     )..forward();
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
         .animate(CurvedAnimation(
-        parent: _fadeController, curve: Curves.easeIn));
+        parent: _fadeController,
+        curve: Curves.easeOut));
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-        parent: _slideController, curve: Curves.easeOut));
+        parent: _slideController,
+        curve: Curves.easeOutCubic));
   }
 
   void _nextPage() {
     HapticFeedback.lightImpact();
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubic,
       );
     } else {
       _navigateToLogin();
@@ -137,11 +139,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _onPageChanged(int index) {
     setState(() => _currentPage = index);
-    // ─── Re-animate on page change ───
+    // ─── Smooth reset aur forward ───
     _fadeController.reset();
     _slideController.reset();
-    _fadeController.forward();
-    _slideController.forward();
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        _fadeController.forward();
+        _slideController.forward();
+      }
+    });
   }
 
   @override
@@ -163,6 +169,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             controller: _pageController,
             onPageChanged: _onPageChanged,
             itemCount: _pages.length,
+            physics: const BouncingScrollPhysics(),
             itemBuilder: (context, index) =>
                 _buildPage(_pages[index]),
           ),
@@ -363,16 +370,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             children: List.generate(
               _pages.length,
                   (index) => AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.symmetric(
-                    horizontal: 4),
-                width: index == _currentPage ? 28 : 8,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOutCubic,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: index == _currentPage ? 32 : 8,
                 height: 8,
                 decoration: BoxDecoration(
                   color: index == _currentPage
                       ? Colors.white
-                      : Colors.white.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(4),
+                      : Colors.white.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: index == _currentPage
+                      ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                      : [],
                 ),
               ),
             ),

@@ -48,8 +48,14 @@ class _MainScreenState extends State<MainScreen>
   @override
   void initState() {
     super.initState();
-    Future.microtask(() =>
-        context.read<ExpenseProvider>().loadExpenses());
+
+    // ─── Auth ready hone ke baad load karo ───
+    Future.microtask(() async {
+      await FirebaseAuth.instance.authStateChanges().first;
+      if (mounted) {
+        context.read<ExpenseProvider>().loadExpenses();
+      }
+    });
 
     _fabController = AnimationController(
       vsync: this,
@@ -85,6 +91,21 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ─── Jab tak data load nahi hota, sirf spinner dikhao ───
+    final isLoading = context.watch<ExpenseProvider>().isLoading;
+
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: primary,
+            strokeWidth: 3,
+          ),
+        ),
+      );
+    }
+
     final List<Widget> screens = [
       const HomeScreen(),
       const ReportsScreen(),
@@ -385,11 +406,136 @@ class _MainScreenState extends State<MainScreen>
       context,
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => Scaffold(
+          // ─── Same AppBar as main screen ───
           appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(0),
-            child: AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0),
+            preferredSize: const Size.fromHeight(64),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+
+                      // ─── Back button ───
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius:
+                            BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: textPrimary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      // ─── Title ───
+                      Expanded(
+                        child: Text(
+                          'Add Expense',
+                          style: GoogleFonts.poppins(
+                            color: textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+
+                      // ─── Search ───
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                const SearchScreen()),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius:
+                            BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.search_rounded,
+                            color: textPrimary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 10),
+
+                      // ─── Avatar ───
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _showProfileSheet();
+                        },
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [primary, primaryDark],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: primary.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              (FirebaseAuth.instance
+                                  .currentUser
+                                  ?.email ??
+                                  'M')
+                                  .substring(0, 1)
+                                  .toUpperCase(),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
           body: const AddExpenseScreen(),
         ),
@@ -402,8 +548,7 @@ class _MainScreenState extends State<MainScreen>
                   parent: anim, curve: Curves.easeOut)),
               child: child,
             ),
-        transitionDuration:
-        const Duration(milliseconds: 350),
+        transitionDuration: const Duration(milliseconds: 350),
       ),
     );
   }
@@ -476,7 +621,7 @@ class _MainScreenState extends State<MainScreen>
                   const SizedBox(height: 12),
 
                   Text(
-                    'Muhammad Abdullah',
+                    user?.displayName ?? user?.email?.split('@')[0] ?? 'User',
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -516,12 +661,12 @@ class _MainScreenState extends State<MainScreen>
                     textSecond,
                         () => Navigator.pop(ctx),
                   ),
-                  _buildSheetItem(
-                    Icons.help_outline_rounded,
-                    'Help & Support',
-                    textSecond,
-                        () => Navigator.pop(ctx),
-                  ),
+                  // _buildSheetItem(
+                  //   Icons.help_outline_rounded,
+                  //   'Help & Support',
+                  //   textSecond,
+                  //       () => Navigator.pop(ctx),
+                  // ),
                   _buildSheetItem(
                     Icons.info_outline_rounded,
                     'About App',
@@ -667,7 +812,8 @@ class _MainScreenState extends State<MainScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('Muhammad Abdullah',
+                Text(
+                    user?.displayName ?? user?.email?.split('@')[0] ?? 'User',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,

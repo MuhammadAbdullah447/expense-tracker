@@ -6,6 +6,9 @@ import 'package:fl_chart/fl_chart.dart';
 import '../providers/expense_provider.dart';
 import '../models/expense_model.dart';
 import 'edit_expense_screen.dart';
+import '../providers/notification_provider.dart';
+import '../models/notification_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -93,6 +96,28 @@ class _HomeScreenState extends State<HomeScreen>
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
           parent: _progressController, curve: Curves.easeOut),
+    );
+  }
+
+  // ─── Notification Panel Bottom Sheet ───
+  void _showNotificationPanel(BuildContext context) {
+    final notifProvider = context.read<NotificationProvider>();
+    notifProvider.markAllAsRead();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ChangeNotifierProvider.value(
+        value: notifProvider,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          builder: (_, scrollController) =>
+              _NotificationSheet(scrollController: scrollController),
+        ),
+      ),
     );
   }
 
@@ -323,34 +348,72 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Muhammad Abdullah',
+                    FirebaseAuth.instance.currentUser?.displayName ?? 'Welcome!',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
               Row(
                 children: [
-                  // ─── Notification ───
-                  _buildHeaderIcon(Icons.notifications_outlined),
-                  const SizedBox(width: 10),
-                  // ─── Avatar ───
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.4),
-                          width: 2),
+                  // ─── Notification bell with badge ───
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _showNotificationPanel(context);
+                    },
+                    child: Stack(
+                      children: [
+                        _buildHeaderIcon(Icons.notifications_outlined),
+                        Consumer<NotificationProvider>(
+                          builder: (_, notifProvider, __) {
+                            final count = notifProvider.unreadCount;
+                            if (count == 0) return const SizedBox.shrink();
+                            return Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    count > 9 ? '9+' : '$count',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.person,
-                        color: Colors.white, size: 22),
                   ),
+                  // const SizedBox(width: 10),
+                  // // ─── Avatar ───
+                  // Container(
+                  //   width: 42,
+                  //   height: 42,
+                  //   decoration: BoxDecoration(
+                  //     shape: BoxShape.circle,
+                  //     color: Colors.white.withOpacity(0.2),
+                  //     border: Border.all(
+                  //         color: Colors.white.withOpacity(0.4), width: 2),
+                  //   ),
+                  //   child: const Icon(Icons.person, color: Colors.white, size: 22),
+                  // ),
                 ],
               ),
             ],
@@ -1355,5 +1418,204 @@ class _HomeScreenState extends State<HomeScreen>
       return '${(amount / 1000).toStringAsFixed(amount % 1000 == 0 ? 0 : 1)}k';
     }
     return amount.toStringAsFixed(0);
+  }
+}
+
+// ─── Notification Sheet Widget ───
+class _NotificationSheet extends StatelessWidget {
+  final ScrollController scrollController;
+  const _NotificationSheet({required this.scrollController});
+
+  Color _typeColor(NotificationType type) {
+    switch (type) {
+      case NotificationType.overBudget: return const Color(0xFFEF4444);
+      case NotificationType.warning:    return const Color(0xFFF97316);
+      case NotificationType.success:    return const Color(0xFF10B981);
+      case NotificationType.info:       return const Color(0xFF3B82F6);
+    }
+  }
+
+  IconData _typeIcon(NotificationType type) {
+    switch (type) {
+      case NotificationType.overBudget: return Icons.warning_rounded;
+      case NotificationType.warning:    return Icons.info_outline_rounded;
+      case NotificationType.success:    return Icons.check_circle_outline;
+      case NotificationType.info:       return Icons.notifications_outlined;
+    }
+  }
+
+  String _timeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1)  return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24)   return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<NotificationProvider>();
+    final notifications = provider.notifications;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // ─── Handle ───
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+
+          // ─── Header ───
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Notifications',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                if (notifications.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      provider.clearAll();
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'Clear All',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: const Color(0xFFEF4444),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1),
+
+          // ─── List or Empty ───
+          Expanded(
+            child: notifications.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.notifications_none_rounded,
+                      size: 64,
+                      color: Colors.grey.shade300),
+                  const SizedBox(height: 12),
+                  Text('No notifications yet',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade400,
+                      )),
+                  const SizedBox(height: 6),
+                  Text('Budget alerts & activity\nwill appear here',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                      )),
+                ],
+              ),
+            )
+                : ListView.separated(
+              controller: scrollController,
+              padding: const EdgeInsets.symmetric(
+                  vertical: 8, horizontal: 16),
+              itemCount: notifications.length,
+              separatorBuilder: (_, __) =>
+              const SizedBox(height: 8),
+              itemBuilder: (_, index) {
+                final n = notifications[index];
+                final color = _typeColor(n.type);
+                final icon  = _typeIcon(n.type);
+
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: color.withOpacity(0.15)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ─── Icon ───
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius:
+                          BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon,
+                            color: color, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      // ─── Content ───
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            Text(n.title,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                )),
+                            const SizedBox(height: 3),
+                            Text(n.message,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                )),
+                            const SizedBox(height: 6),
+                            Text(_timeAgo(n.time),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 10,
+                                  color: color,
+                                  fontWeight: FontWeight.w500,
+                                )),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

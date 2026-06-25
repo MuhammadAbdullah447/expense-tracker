@@ -73,8 +73,8 @@ class _SplashScreenState extends State<SplashScreen>
     // Pulse — icon glow effect
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -426,25 +426,31 @@ class _SplashScreenState extends State<SplashScreen>
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(3, (index) {
-            // ─── Staggered delay per dot ───
-            final delay  = index * 0.25;
-            final value  = (_pulseController.value - delay)
-                .clamp(0.0, 1.0);
-            final sine   = (value * 3.14159).clamp(0.0, 3.14159);
-            final bounce = (sine < 0 ? 0.0 : sine) * 8;
+            // ─── Har dot ka alag phase ───
+            final phase = ((_pulseController.value -
+                (index * 0.33)) %
+                1.0)
+                .abs();
+
+            // ─── Smooth sine wave ───
+            final bounce = (phase < 0.5)
+                ? phase * 2
+                : (1.0 - phase) * 2;
 
             return Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: 5),
               child: Transform.translate(
-                offset: Offset(0, -bounce),
-                child: Container(
-                  width: 8,
+                offset: Offset(0, -10 * bounce),
+                child: AnimatedContainer(
+                  duration:
+                  const Duration(milliseconds: 100),
+                  width:  8,
                   height: 8,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white.withOpacity(
-                        0.4 + value * 0.6),
+                        0.4 + (0.6 * bounce)),
                   ),
                 ),
               ),

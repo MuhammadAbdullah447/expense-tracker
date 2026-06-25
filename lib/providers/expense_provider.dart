@@ -11,13 +11,23 @@ class ExpenseProvider extends ChangeNotifier {
 
   List<ExpenseModel> _expenses  = [];
   double             _budget    = 50000;
-  bool               _isLoading = false;
+  bool               _isLoading = true;  // ← default true, taake MainScreen shuru se hi spinner dikhaye
+
+  // ─── Notification callbacks ───
+  void Function(String title, double amount)?  onExpenseAdded;
+  void Function(String title)?                 onExpenseDeleted;
+  void Function(double budget)?                onBudgetUpdated;
+  void Function(double spent, double budget)?  onCheckBudget;
 
   List<ExpenseModel> get expenses  => _expenses;
   double             get budget    => _budget;
   bool               get isLoading => _isLoading;
 
-  String get _userId => _auth.currentUser!.uid;
+  String get _userId {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User not logged in');
+    return user.uid;
+  }
 
   double get totalSpent {
     double total = 0;
@@ -46,18 +56,27 @@ class ExpenseProvider extends ChangeNotifier {
     ).toList();
   }
 
-  // ─── Firestore se expenses load karo ───
   Future<void> loadExpenses() async {
     _isLoading = true;
     notifyListeners();
 
     try {
+      // ─── Auth state settle hone ka wait karo ───
+      final user = _auth.currentUser ??
+          await _auth.authStateChanges().first;
+
+      if (user == null) {
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       final snapshot = await _firestore
           .collection('users')
-          .doc(_userId)
+          .doc(user.uid)
           .collection('expenses')
           .orderBy('date', descending: true)
-          .get();
+          .get(const GetOptions(source: Source.serverAndCache));
 
       _expenses = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -75,13 +94,15 @@ class ExpenseProvider extends ChangeNotifier {
 
       final userDoc = await _firestore
           .collection('users')
-          .doc(_userId)
-          .get();
+          .doc(user.uid)
+          .get(const GetOptions(source: Source.serverAndCache));
 
       if (userDoc.exists &&
           userDoc.data()!.containsKey('budget')) {
         _budget = userDoc.data()!['budget'].toDouble();
       }
+
+      onCheckBudget?.call(totalSpent, _budget);
 
     } catch (e) {
       print('Error loading expenses: $e');
@@ -91,7 +112,6 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Naya expense add karo ───
   Future<void> addExpense(ExpenseModel expense) async {
     try {
       final docRef = await _firestore
@@ -117,12 +137,16 @@ class ExpenseProvider extends ChangeNotifier {
 
       _expenses.insert(0, newExpense);
       notifyListeners();
+
+      // ─── Fire notifications ───
+      onExpenseAdded?.call(expense.title, expense.amount);
+      onCheckBudget?.call(totalSpent, _budget);
+
     } catch (e) {
       print('Error adding expense: $e');
     }
   }
 
-  // ─── Expense delete karo ───
   Future<void> deleteExpense(ExpenseModel expense) async {
     try {
       await _firestore
@@ -134,12 +158,15 @@ class ExpenseProvider extends ChangeNotifier {
 
       _expenses.removeWhere((e) => e.id == expense.id);
       notifyListeners();
+
+      // ─── Fire notification ───
+      onExpenseDeleted?.call(expense.title);
+
     } catch (e) {
       print('Error deleting expense: $e');
     }
   }
 
-  // ─── Expense update karo ───
   Future<void> updateExpense(ExpenseModel updated) async {
     try {
       await _firestore
@@ -155,8 +182,7 @@ class ExpenseProvider extends ChangeNotifier {
         'note':     updated.note,
       });
 
-      final index =
-      _expenses.indexWhere((e) => e.id == updated.id);
+      final index = _expenses.indexWhere((e) => e.id == updated.id);
       if (index != -1) {
         _expenses[index] = updated;
         notifyListeners();
@@ -166,7 +192,6 @@ class ExpenseProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Budget update karo ───
   Future<void> updateBudget(double newBudget) async {
     try {
       await _firestore
@@ -176,20 +201,24 @@ class ExpenseProvider extends ChangeNotifier {
 
       _budget = newBudget;
       notifyListeners();
+
+      // ─── Fire notifications ───
+      onBudgetUpdated?.call(newBudget);
+      onCheckBudget?.call(totalSpent, newBudget);
+
     } catch (e) {
       print('Error updating budget: $e');
     }
   }
 
-  // ─── Restore expense ───
   Future<void> restoreExpense(ExpenseModel expense) async {
     await addExpense(expense);
   }
 
-  // ─── Logout par data clear karo ───
   void clearData() {
     _expenses  = [];
     _budget    = 50000;
+    _isLoading = true;  // ← agla login/signup pe phir loading state se shuru ho
     notifyListeners();
   }
 }
